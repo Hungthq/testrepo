@@ -6,4 +6,4 @@ This is a markdown file in this repository.
 
 ## Projects
 
-- [Draw & Learn](draw-and-learn/): a drawing and tracing app for kids. Open `draw-and-learn/index.html` in a browser.
+- [Draw & Learn](draw-and-learn/): kids draw anything, and Claude guesses what it is and shares fun facts, a story and a joke. See its README for setup.

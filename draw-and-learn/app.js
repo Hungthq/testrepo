@@ -63,6 +63,7 @@
     stamp: STAMPS[0],
     hue: 0,
     sound: true,
+    lang: 'en',
     index: { letters: 0, numbers: 0, shapes: 0 },
   };
 
@@ -80,10 +81,11 @@
   let boardH = 0;
 
   // ---------- Sound ----------
-  function speak(text) {
-    if (!state.sound || !('speechSynthesis' in window)) return;
+  function speak(text, lang = 'en') {
+    if (!state.sound || !text || !('speechSynthesis' in window)) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === 'vi' ? 'vi-VN' : 'en-US';
     u.rate = 0.85;
     u.pitch = 1.25;
     speechSynthesis.speak(u);
@@ -474,6 +476,7 @@
     state.mode = mode;
     document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     $('lessonBar').classList.toggle('hidden', mode === 'free');
+    $('magicBtn').classList.toggle('hidden', mode !== 'free');
     clearDrawing(false);
     undoStack.length = 0;
     if (mode !== 'free' && state.tool === 'stamp') setTool('brush');
@@ -571,6 +574,335 @@
     speak('Saved your picture!');
   }
 
+  // ---------- "What did I draw?" (Claude looks at the drawing) ----------
+  const UI = {
+    en: {
+      magic: 'What did I draw?', loading: ['Hmm… let me look!', 'Ooh, interesting…', 'Looking closely…'],
+      empty: 'Draw something first, then press me!', notSure: 'Hmm, is it…', notQuite: 'Not quite? Is it…',
+      hintPlaceholder: 'I drew a…', tryAgain: 'Try again', newDrawing: 'New drawing',
+      facts: 'Facts', story: 'Story', joke: 'Joke', sound: 'Sound', sayAgain: '🔊 Again',
+      gallery: 'My Gallery', galleryEmpty: 'Your drawings will show up here after you press ✨',
+      errors: {
+        offline: 'The magic needs a grown-up to start the Draw & Learn server. (See the README!)',
+        setup: 'The magic key is missing. Ask a grown-up to set it up.',
+        busy: 'So many drawings! Let\'s wait a moment and try again.',
+        failed: 'Oops! My magic glasses got foggy. Let\'s try again!',
+      },
+    },
+    vi: {
+      magic: 'Bé vẽ gì đây?', loading: ['Ừm… để tớ xem nào!', 'Ồ, thú vị quá…', 'Đang nhìn kỹ…'],
+      empty: 'Bé hãy vẽ gì đó trước, rồi bấm tớ nhé!', notSure: 'Ừm, có phải là…', notQuite: 'Chưa đúng à? Có phải là…',
+      hintPlaceholder: 'Bé vẽ con…', tryAgain: 'Thử lại', newDrawing: 'Vẽ tranh mới',
+      facts: 'Điều hay', story: 'Truyện', joke: 'Câu đố vui', sound: 'Âm thanh', sayAgain: '🔊 Nghe lại',
+      gallery: 'Tranh của bé', galleryEmpty: 'Tranh của bé sẽ hiện ở đây sau khi bấm ✨',
+      errors: {
+        offline: 'Phép thuật cần người lớn bật máy chủ Draw & Learn. (Xem README nhé!)',
+        setup: 'Thiếu chìa khoá phép thuật. Nhờ người lớn cài đặt giúp nhé.',
+        busy: 'Nhiều tranh quá! Đợi một chút rồi thử lại nhé.',
+        failed: 'Ối! Kính thần kỳ của tớ bị mờ rồi. Thử lại nhé!',
+      },
+    },
+  };
+  const t = (key) => UI[state.lang][key];
+
+  const look = { result: null, image: null, thumb: null, tab: 'facts' };
+  const lookModal = $('lookModal');
+
+  function applyLanguage() {
+    $('langBtn').textContent = state.lang === 'vi' ? 'VI' : 'EN';
+    $('magicLabel').textContent = t('magic');
+    $('hintInput').placeholder = t('hintPlaceholder');
+    document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  }
+
+  // Crops the drawing to what was actually drawn, on a white background, as PNG base64.
+  function exportDrawing(maxSize) {
+    const w = drawCanvas.width;
+    const h = drawCanvas.height;
+    const data = dctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        if (data[(y * w + x) * 4 + 3] > 20) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    const pad = Math.max(maxX - minX, maxY - minY) * 0.1 + 10 * dpr;
+    minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+    maxX = Math.min(w, maxX + pad); maxY = Math.min(h, maxY + pad);
+    const cw = maxX - minX;
+    const ch = maxY - minY;
+    const scale = Math.min(1, maxSize / Math.max(cw, ch));
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(cw * scale));
+    out.height = Math.max(1, Math.round(ch * scale));
+    const o = out.getContext('2d');
+    o.fillStyle = '#fff';
+    o.fillRect(0, 0, out.width, out.height);
+    o.drawImage(drawCanvas, minX, minY, cw, ch, 0, 0, out.width, out.height);
+    return out;
+  }
+
+  function showLookState(which) {
+    $('lookLoading').classList.toggle('hidden', which !== 'loading');
+    $('lookError').classList.toggle('hidden', which !== 'error');
+    $('lookResult').classList.toggle('hidden', which !== 'result');
+  }
+
+  async function whatDidIDraw(hint = '') {
+    if (!hint) {
+      const canvas = exportDrawing(768);
+      if (!canvas) {
+        showMessage('✏️', t('empty'));
+        speak(t('empty'), state.lang);
+        return;
+      }
+      look.image = canvas.toDataURL('image/png');
+      look.thumb = (exportDrawing(240) || canvas).toDataURL('image/jpeg', 0.7);
+    }
+    closeStampPicker();
+    clearTimeout(revealTimer);
+    lookModal.classList.remove('hidden');
+    showLookState('loading');
+    const lines = t('loading');
+    const line = lines[Math.floor(Math.random() * lines.length)];
+    $('loadingText').textContent = line;
+    speak(line, state.lang);
+
+    try {
+      const res = await fetch('api/look', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: look.image, hint, lang: state.lang }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || (res.status === 404 || res.status === 405 ? 'offline' : 'failed'));
+      showResult(body, true);
+      saveToGallery(body);
+    } catch (err) {
+      const key = err instanceof TypeError ? 'offline' : err.message;
+      const msg = t('errors')[key] || t('errors').failed;
+      $('errorText').textContent = msg;
+      showLookState('error');
+      speak(msg, state.lang);
+    }
+  }
+
+  function showResult(r, celebrate) {
+    look.result = r;
+    $('resultEmoji').textContent = r.emoji || '🎨';
+    $('lookTitle').textContent = r.title;
+    $('resultCompliment').textContent = r.compliment;
+    $('guessLabel').textContent = r.recognized ? t('notQuite') : t('notSure');
+    const chips = $('guessChips');
+    chips.textContent = '';
+    (r.guesses || []).slice(0, 3).forEach((g) => {
+      const b = document.createElement('button');
+      b.className = 'guess-chip';
+      b.textContent = g;
+      b.addEventListener('click', () => whatDidIDraw(g));
+      chips.appendChild(b);
+    });
+    $('hintInput').value = '';
+    $('challengeText').textContent = r.challenge;
+    showLookState('result');
+    setTab('facts', false);
+    if (!celebrate) {
+      speak(`${r.title} ${r.compliment}`, state.lang);
+      return;
+    }
+    // Celebrate first: the drawing jumps to life under a shower of emoji, then the card pops up.
+    lookModal.classList.add('hidden');
+    chime([523, 659, 784, 1047]);
+    speak(r.sound, state.lang);
+    emojiRain(r.recognized && r.emoji ? r.emoji : '⭐');
+    drawCanvas.classList.remove('alive');
+    void drawCanvas.offsetWidth;
+    drawCanvas.classList.add('alive');
+    clearTimeout(revealTimer);
+    revealTimer = setTimeout(() => {
+      if (look.result !== r) return;
+      lookModal.classList.remove('hidden');
+      speak(`${r.title} ${r.compliment}`, state.lang);
+    }, 1800);
+  }
+  let revealTimer = null;
+
+  function setTab(tab, read = true) {
+    const r = look.result;
+    if (!r) return;
+    look.tab = tab;
+    document.querySelectorAll('.fun-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    const panel = $('funPanel');
+    panel.textContent = '';
+    let say = '';
+    if (tab === 'facts') {
+      const ul = document.createElement('ul');
+      (r.facts || []).forEach((f) => {
+        const li = document.createElement('li');
+        li.textContent = f;
+        ul.appendChild(li);
+      });
+      panel.appendChild(ul);
+      say = (r.facts || []).join(' ');
+    } else if (tab === 'sound') {
+      const d = document.createElement('div');
+      d.className = 'sound-word';
+      d.textContent = `${r.emoji || ''} ${r.sound}`;
+      panel.appendChild(d);
+      say = r.sound;
+    } else {
+      panel.textContent = tab === 'story' ? r.story : r.joke;
+      say = panel.textContent;
+    }
+    const again = document.createElement('button');
+    again.className = 'pill-btn say-again';
+    again.textContent = t('sayAgain');
+    again.addEventListener('click', () => speak(say, state.lang));
+    panel.appendChild(again);
+    if (read) speak(say, state.lang);
+  }
+
+  function emojiRain(emoji) {
+    const rain = $('emojiRain');
+    const pick = emoji.trim() || '⭐';
+    rain.textContent = '';
+    for (let i = 0; i < 28; i++) {
+      const s = document.createElement('span');
+      s.textContent = pick;
+      s.style.left = `${Math.random() * 100}%`;
+      s.style.fontSize = `${24 + Math.random() * 36}px`;
+      s.style.animationDuration = `${2 + Math.random() * 2.5}s`;
+      s.style.animationDelay = `${Math.random() * 1.2}s`;
+      s.style.setProperty('--fall', `${window.innerHeight + 120}px`);
+      s.style.setProperty('--spin', `${(Math.random() - 0.5) * 720}deg`);
+      rain.appendChild(s);
+      setTimeout(() => s.remove(), 6000);
+    }
+  }
+
+  function closeModal(modal) {
+    clearTimeout(revealTimer);
+    modal.classList.add('hidden');
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    stopListening();
+  }
+
+  // Speech-to-text so kids who can't type yet can say what they drew.
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognizer = null;
+  function stopListening() {
+    if (recognizer) { try { recognizer.abort(); } catch (_) { /* ignore */ } }
+    recognizer = null;
+    $('micBtn').classList.remove('listening');
+  }
+  function listen() {
+    if (!Recognition) return;
+    if (recognizer) return stopListening();
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    recognizer = new Recognition();
+    recognizer.lang = state.lang === 'vi' ? 'vi-VN' : 'en-US';
+    recognizer.interimResults = false;
+    recognizer.maxAlternatives = 1;
+    recognizer.onresult = (e) => {
+      const said = e.results[0][0].transcript.trim();
+      $('hintInput').value = said;
+      if (said) whatDidIDraw(said);
+    };
+    recognizer.onend = stopListening;
+    recognizer.onerror = stopListening;
+    $('micBtn').classList.add('listening');
+    recognizer.start();
+  }
+
+  // ---------- Gallery (kept on this device only) ----------
+  const GALLERY_KEY = 'draw-and-learn-gallery';
+  const GALLERY_MAX = 24;
+
+  function loadGallery() {
+    try { return JSON.parse(localStorage.getItem(GALLERY_KEY)) || []; } catch (_) { return []; }
+  }
+
+  function saveToGallery(result) {
+    const items = loadGallery().filter((it) => it.thumb !== look.thumb); // a re-guess replaces the old entry
+    items.unshift({ thumb: look.thumb, result, date: Date.now() });
+    while (items.length) {
+      try {
+        localStorage.setItem(GALLERY_KEY, JSON.stringify(items.slice(0, GALLERY_MAX)));
+        return;
+      } catch (_) {
+        items.pop(); // storage full: drop the oldest and retry
+      }
+    }
+  }
+
+  function openGallery() {
+    const grid = $('galleryGrid');
+    grid.textContent = '';
+    const items = loadGallery();
+    $('galleryEmpty').classList.toggle('hidden', items.length > 0);
+    items.forEach((it) => {
+      const b = document.createElement('button');
+      b.className = 'gallery-item';
+      const img = document.createElement('img');
+      img.src = it.thumb;
+      img.alt = it.result.thing;
+      const label = document.createElement('div');
+      label.textContent = `${it.result.emoji || ''} ${it.result.thing}`;
+      b.append(img, label);
+      b.addEventListener('click', () => {
+        closeModal($('galleryModal'));
+        look.thumb = it.thumb;
+        look.image = null; // re-guessing needs the original drawing, so hide those controls
+        lookModal.classList.remove('hidden');
+        showResult(it.result, false);
+        $('guessChips').parentElement.classList.add('hidden');
+      });
+      grid.appendChild(b);
+    });
+    $('galleryModal').classList.remove('hidden');
+  }
+
+  $('magicBtn').addEventListener('click', () => {
+    $('guessChips').parentElement.classList.remove('hidden');
+    whatDidIDraw();
+  });
+  $('retryBtn').addEventListener('click', () => whatDidIDraw($('hintInput').value.trim()));
+  document.querySelectorAll('.fun-tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  $('hintForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const hint = $('hintInput').value.trim();
+    if (hint && look.image) whatDidIDraw(hint);
+  });
+  if (Recognition) $('micBtn').classList.remove('hidden');
+  $('micBtn').addEventListener('click', listen);
+  $('challengeBtn').addEventListener('click', () => {
+    closeModal(lookModal);
+    if (look.result) speak(look.result.challenge, state.lang);
+  });
+  $('newDrawingBtn').addEventListener('click', () => {
+    closeModal(lookModal);
+    clearDrawing(true);
+  });
+  $('galleryBtn').addEventListener('click', openGallery);
+  $('langBtn').addEventListener('click', () => {
+    state.lang = state.lang === 'en' ? 'vi' : 'en';
+    try { localStorage.setItem('draw-and-learn-lang', state.lang); } catch (_) { /* ignore */ }
+    applyLanguage();
+  });
+  document.querySelectorAll('.modal').forEach((m) => {
+    m.addEventListener('click', (e) => {
+      if (e.target === m || e.target.closest('[data-close]')) closeModal(m);
+    });
+  });
+  try { state.lang = localStorage.getItem('draw-and-learn-lang') === 'vi' ? 'vi' : 'en'; } catch (_) { /* ignore */ }
+  applyLanguage();
+
   // ---------- Wire up ----------
   document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   document.querySelectorAll('.size-btn').forEach((b) => b.addEventListener('click', () => {
@@ -596,6 +928,8 @@
   });
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal:not(.hidden)').forEach(closeModal);
+    if (e.target.tagName === 'INPUT') return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     if (state.mode !== 'free') {
       if (e.key === 'ArrowRight') stepLesson(1);

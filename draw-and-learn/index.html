@@ -16,7 +16,11 @@
       <button class="mode-btn" data-mode="numbers" role="tab">🔢 123</button>
       <button class="mode-btn" data-mode="shapes" role="tab">🔷 Shapes</button>
     </nav>
-    <button id="soundBtn" class="icon-btn" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+    <div class="top-actions">
+      <button id="langBtn" class="icon-btn lang" title="Language" aria-label="Change language">EN</button>
+      <button id="galleryBtn" class="icon-btn" title="My gallery" aria-label="My gallery">🖼️</button>
+      <button id="soundBtn" class="icon-btn" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+    </div>
   </header>
 
   <section id="lessonBar" class="lesson-bar hidden">
@@ -34,6 +38,7 @@
     <div id="board" class="board">
       <canvas id="guideCanvas"></canvas>
       <canvas id="drawCanvas"></canvas>
+      <button id="magicBtn" class="magic-btn">✨ <span id="magicLabel">What did I draw?</span></button>
       <div id="celebrate" class="celebrate hidden">
         <div id="stars" class="stars">⭐⭐⭐</div>
         <div id="praise" class="praise">Great job!</div>
@@ -58,6 +63,69 @@
     </div>
     <div id="stampPicker" class="stamp-picker hidden"></div>
   </footer>
+
+  <!-- "What did I draw?" result -->
+  <div id="lookModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lookTitle">
+    <div class="card">
+      <button class="close-btn" data-close aria-label="Close">✖️</button>
+
+      <div id="lookLoading" class="look-loading">
+        <div class="magnifier">🔍</div>
+        <div id="loadingText" class="loading-text">Hmm… let me look!</div>
+      </div>
+
+      <div id="lookError" class="look-error hidden">
+        <div class="big-emoji">🙈</div>
+        <p id="errorText"></p>
+        <button id="retryBtn" class="pill-btn">🔁 <span data-t="tryAgain">Try again</span></button>
+      </div>
+
+      <div id="lookResult" class="hidden">
+        <div class="result-head">
+          <div id="resultEmoji" class="result-emoji">🐱</div>
+          <div>
+            <h2 id="lookTitle" class="result-title">Wow, a cat!</h2>
+            <p id="resultCompliment" class="result-compliment"></p>
+          </div>
+        </div>
+
+        <div class="fun-tabs" role="tablist">
+          <button class="fun-tab active" data-tab="facts">🧠 <span data-t="facts">Facts</span></button>
+          <button class="fun-tab" data-tab="story">📖 <span data-t="story">Story</span></button>
+          <button class="fun-tab" data-tab="joke">😂 <span data-t="joke">Joke</span></button>
+          <button class="fun-tab" data-tab="sound">🔊 <span data-t="sound">Sound</span></button>
+        </div>
+        <div id="funPanel" class="fun-panel"></div>
+
+        <div class="guess-row">
+          <span id="guessLabel" class="guess-label">Not quite? Is it…</span>
+          <div id="guessChips" class="guess-chips"></div>
+          <form id="hintForm" class="hint-form">
+            <input id="hintInput" maxlength="40" autocomplete="off" placeholder="I drew a…">
+            <button id="micBtn" type="button" class="round-btn hidden" aria-label="Say it">🎤</button>
+            <button type="submit" class="round-btn" aria-label="Tell">👉</button>
+          </form>
+        </div>
+
+        <div class="result-actions">
+          <button id="challengeBtn" class="pill-btn challenge">🎨 <span id="challengeText"></span></button>
+          <button id="newDrawingBtn" class="pill-btn">🆕 <span data-t="newDrawing">New drawing</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gallery -->
+  <div id="galleryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
+    <div class="card">
+      <button class="close-btn" data-close aria-label="Close">✖️</button>
+      <h2 id="galleryTitle" class="result-title">🖼️ <span data-t="gallery">My Gallery</span></h2>
+      <div id="galleryGrid" class="gallery-grid"></div>
+      <p id="galleryEmpty" class="gallery-empty" data-t="galleryEmpty">Your drawings will show up here after you press ✨</p>
+    </div>
+  </div>
+
+  <div id="emojiRain" class="emoji-rain" aria-hidden="true"></div>
 
   <script src="app.js"></script>
 </body>

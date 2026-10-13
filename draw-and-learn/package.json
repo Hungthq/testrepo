@@ -1,0 +1,16 @@
+{
+  "name": "draw-and-learn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A drawing app for kids: draw anything, and Claude guesses what it is and shares fun facts, a story and a joke.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0"
+  }
+}
