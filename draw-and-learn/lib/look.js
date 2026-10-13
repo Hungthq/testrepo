@@ -13,8 +13,17 @@ export function apiKey() {
   return String(process.env.ANTHROPIC_API_KEY || '').replace(/[\s"'`]/g, '');
 }
 
+// Organization-wide keys (sk-ant-svc-...) must say which workspace to use.
+function workspaceId() {
+  return String(process.env.ANTHROPIC_WORKSPACE_ID || '').replace(/[\s"'`]/g, '');
+}
+
 function getClient() {
-  client = client || new Anthropic({ apiKey: apiKey() || null });
+  const workspace = workspaceId();
+  client = client || new Anthropic({
+    apiKey: apiKey() || null,
+    defaultHeaders: workspace ? { 'anthropic-workspace-id': workspace } : undefined,
+  });
   return client;
 }
 
@@ -27,6 +36,8 @@ export function describeKey() {
     length: key.length,
     starts_with: key.slice(0, 12),
     looks_like_api_key: key.startsWith('sk-ant-api'),
+    is_service_key: key.startsWith('sk-ant-svc'),
+    workspace_id: workspaceId() || null,
     had_spaces_quotes_or_newlines: raw !== key,
   };
 }

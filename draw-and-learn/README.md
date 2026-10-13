@@ -38,12 +38,14 @@ The app also runs on [Vercel](https://vercel.com): the page is served as static 
 1. Import the GitHub repo in Vercel and set **Root Directory** to `draw-and-learn`.
 2. In the project's **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` (mark it Sensitive). Adding a `FAMILY_CODE` is strongly recommended too (see below).
 3. Redeploy. Pushes to `main` deploy automatically after that.
+4. Open `/api/health?check=1` on your site to confirm the key works: look for `"claude":{"ok":true}`.
 
 ### Settings
 
 | Variable | Default | What it does |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | (required) | Your Claude API key |
+| `ANTHROPIC_WORKSPACE_ID` | (none) | Only needed for organization-wide service keys (`sk-ant-svc-...`): the workspace to use, like `wrkspc_...`. Regular API keys (`sk-ant-api03-...`) don't need it. |
 | `PORT` | `3000` | Port the app runs on |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | Which Claude model looks at the drawings |
 | `FAMILY_CODE` | (none) | Optional password. When set, each device asks a grown-up for the code once and remembers it, so strangers who find the URL can't spend your API credits. Recommended on Vercel. |
