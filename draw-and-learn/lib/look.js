@@ -7,6 +7,46 @@ const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';
 
 let client = null;
 
+// API keys never contain spaces, line breaks or quotes, but all three sneak in
+// easily when a key is pasted on a phone, so clean them off.
+export function apiKey() {
+  return String(process.env.ANTHROPIC_API_KEY || '').replace(/[\s"'`]/g, '');
+}
+
+function getClient() {
+  client = client || new Anthropic({ apiKey: apiKey() || null });
+  return client;
+}
+
+// A safe description of the key (never the key itself) for /api/health.
+export function describeKey() {
+  const key = apiKey();
+  const raw = String(process.env.ANTHROPIC_API_KEY || '');
+  return {
+    set: key.length > 0,
+    length: key.length,
+    starts_with: key.slice(0, 12),
+    looks_like_api_key: key.startsWith('sk-ant-api'),
+    had_spaces_quotes_or_newlines: raw !== key,
+  };
+}
+
+// Asks Anthropic whether the key works, without using any tokens.
+export async function checkKey() {
+  if (!apiKey()) return { ok: false, problem: 'ANTHROPIC_API_KEY is not set in this deployment' };
+  try {
+    await getClient().models.retrieve(MODEL);
+    return { ok: true, model: MODEL };
+  } catch (err) {
+    return {
+      ok: false,
+      status: err.status ?? null,
+      type: err.error?.error?.type ?? err.name,
+      message: err.error?.error?.message ?? err.message,
+    };
+  }
+}
+
 const SYSTEM = `You are "Doodle Buddy", a warm, playful friend inside a drawing app for young children (about 3 to 8 years old).
 A child has just drawn a picture with their finger and wants to know what you see.
 
@@ -63,8 +103,7 @@ async function askClaude({ image, hint }) {
     ? `Here is my drawing! What did I draw? Hint from the child: "${hint}".`
     : 'Here is my drawing! What did I draw?';
 
-  client = client || new Anthropic();
-  const response = await client.beta.messages.create({
+  const response = await getClient().beta.messages.create({
     model: MODEL,
     max_tokens: 6000,
     betas: ['server-side-fallback-2026-07-01'],
@@ -113,9 +152,10 @@ export async function look(body, familyCode) {
   try {
     return { status: 200, body: await askClaude({ image, hint }) };
   } catch (err) {
+    const detail = err.error?.error?.message ?? err.message;
     if (err instanceof Anthropic.AuthenticationError) {
-      console.error('Claude API key is missing or invalid. Set ANTHROPIC_API_KEY.');
-      return { status: 500, body: { error: 'setup' } };
+      console.error('Claude rejected the API key:', detail);
+      return { status: 500, body: { error: 'setup', detail: `Claude said: ${detail} (${err.status})` } };
     }
     if (err instanceof Anthropic.RateLimitError) {
       return { status: 429, body: { error: 'busy' } };
@@ -124,11 +164,14 @@ export async function look(body, familyCode) {
       console.error('Could not reach the Claude API:', err.message);
       return { status: 503, body: { error: 'offline' } };
     }
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+    if (!apiKey()) {
       console.error('ANTHROPIC_API_KEY is not set.');
-      return { status: 500, body: { error: 'setup' } };
+      return { status: 500, body: { error: 'setup', detail: 'ANTHROPIC_API_KEY is not set in this deployment.' } };
     }
-    console.error('Look failed:', err.status || '', err.message);
-    return { status: err.status === 422 ? 422 : 500, body: { error: 'failed' } };
+    console.error('Look failed:', err.status || '', detail);
+    return {
+      status: err.status === 422 ? 422 : 500,
+      body: { error: 'failed', detail: err.status ? `Claude said: ${detail} (${err.status})` : detail },
+    };
   }
 }

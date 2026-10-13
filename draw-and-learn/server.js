@@ -9,7 +9,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { look } from './lib/look.js';
+import { look, checkKey, describeKey } from './lib/look.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -53,7 +53,14 @@ async function handleLook(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (req.method === 'POST' && url.pathname === '/api/look') return handleLook(req, res);
-  if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true });
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    const body = { ok: true };
+    if (url.searchParams.has('check')) {
+      body.key = describeKey();
+      body.claude = await checkKey();
+    }
+    return send(res, 200, body);
+  }
 
   const file = STATIC[url.pathname];
   if (req.method !== 'GET' || !file) return send(res, 404, 'Not found', 'text/plain');
@@ -67,7 +74,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`🖍️  Draw & Learn is running at http://localhost:${PORT}`);
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+  if (!describeKey().set) {
     console.log('⚠️  ANTHROPIC_API_KEY is not set, so "What did I draw?" will not work yet.');
   }
 });

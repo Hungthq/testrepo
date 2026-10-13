@@ -663,13 +663,17 @@
         res = await send();
         body = await res.json().catch(() => ({}));
       }
-      if (!res.ok) throw new Error(body.error || (res.status === 404 || res.status === 405 ? 'offline' : 'failed'));
+      if (!res.ok) {
+        const key = body.error || (res.status === 404 || res.status === 405 ? 'offline' : 'failed');
+        throw Object.assign(new Error(key), { detail: body.detail });
+      }
       showResult(body, true);
       saveToGallery(body);
     } catch (err) {
       const key = err instanceof TypeError ? 'offline' : err.message;
       const msg = TEXT.errors[key] || TEXT.errors.failed;
       $('errorText').textContent = msg;
+      $('errorDetail').textContent = err.detail || '';
       showLookState('error');
       speak(msg);
     }

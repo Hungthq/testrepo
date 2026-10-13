@@ -323,6 +323,7 @@ button {
 .loading-text { font-size: 1.5rem; font-weight: bold; margin-top: 8px; }
 .big-emoji { font-size: 4rem; }
 .look-error p { font-size: 1.3rem; }
+.look-error p.error-detail { font-size: .85rem; opacity: .6; font-family: ui-monospace, monospace; word-break: break-word; }
 
 .result-head { display: flex; gap: 16px; align-items: center; padding-right: 40px; }
 .result-emoji { font-size: 4.5rem; line-height: 1; animation: bounce 1s ease-in-out infinite alternate; }
