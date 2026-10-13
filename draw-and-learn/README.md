@@ -31,6 +31,14 @@ The ✨ button uses the Claude API. The key stays on a small server on your comp
 
 4. Open <http://localhost:3000>. On a tablet or phone on the same Wi-Fi, open `http://<your-computer's-IP>:3000`, then use "Add to Home Screen" so it opens like an app.
 
+### Deploying to Vercel
+
+The app also runs on [Vercel](https://vercel.com): the page is served as static files and `api/look.js` runs as a Vercel Function.
+
+1. Import the GitHub repo in Vercel and set **Root Directory** to `draw-and-learn`.
+2. In the project's **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` (mark it Sensitive). Adding a `FAMILY_CODE` is strongly recommended too (see below).
+3. Redeploy. Pushes to `main` deploy automatically after that.
+
 ### Settings
 
 | Variable | Default | What it does |
@@ -38,6 +46,7 @@ The ✨ button uses the Claude API. The key stays on a small server on your comp
 | `ANTHROPIC_API_KEY` | (required) | Your Claude API key |
 | `PORT` | `3000` | Port the app runs on |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | Which Claude model looks at the drawings |
+| `FAMILY_CODE` | (none) | Optional password. When set, each device asks a grown-up for the code once and remembers it, so strangers who find the URL can't spend your API credits. Recommended on Vercel. |
 
 **Cost:** each ✨ press is one Claude request with a small image, roughly 1–3 US cents with the default model. The server asks for low effort to keep answers quick. If Claude's safety checks ever decline a request, it's automatically retried on Anthropic's recommended fallback model (`fallbacks: "default"`).
 
@@ -49,4 +58,6 @@ The ✨ button uses the Claude API. The key stays on a small server on your comp
 |---|---|
 | `index.html`, `style.css` | The page and its kid-friendly styling (works on phones and tablets) |
 | `app.js` | Drawing tools, tracing lessons, speech, the ✨ result card, the sing-along player and the gallery |
-| `server.js` | Serves the app and handles `POST /api/look`. It crops the drawing, sends it to Claude with a kid-safe prompt, and gets back structured JSON (thing, emoji, story, song lyrics and tune, facts, joke, sound, challenge, other guesses) |
+| `lib/look.js` | Sends the cropped drawing to Claude with a kid-safe prompt and gets back structured JSON (thing, emoji, story, song lyrics and tune, facts, joke, sound, challenge, other guesses) |
+| `server.js` | Local server: serves the app and handles `POST /api/look` using `lib/look.js` |
+| `api/look.js`, `api/health.js` | The same endpoints as Vercel Functions |

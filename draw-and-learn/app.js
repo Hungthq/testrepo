@@ -583,6 +583,7 @@
     errors: {
       offline: 'The magic needs a grown-up to start the Draw & Learn server. (See the README!)',
       setup: 'The magic key is missing. Ask a grown-up to set it up.',
+      code: 'The magic needs the family code. Ask a grown-up to help!',
       busy: 'So many drawings! Let\'s wait a moment and try again.',
       failed: 'Oops! My magic glasses got foggy. Let\'s try again!',
     },
@@ -651,12 +652,17 @@
     speak(line);
 
     try {
-      const res = await fetch('api/look', {
+      const send = () => fetch('api/look', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Family-Code': familyCode() },
         body: JSON.stringify({ image: look.image, hint }),
       });
-      const body = await res.json().catch(() => ({}));
+      let res = await send();
+      let body = await res.json().catch(() => ({}));
+      if (res.status === 401 && body.error === 'code' && askFamilyCode()) {
+        res = await send();
+        body = await res.json().catch(() => ({}));
+      }
       if (!res.ok) throw new Error(body.error || (res.status === 404 || res.status === 405 ? 'offline' : 'failed'));
       showResult(body, true);
       saveToGallery(body);
@@ -667,6 +673,18 @@
       showLookState('error');
       speak(msg);
     }
+  }
+
+  // Optional family code (set FAMILY_CODE on the server) so only your devices can use Claude.
+  const CODE_KEY = 'draw-and-learn-family-code';
+  function familyCode() {
+    try { return localStorage.getItem(CODE_KEY) || ''; } catch (_) { return ''; }
+  }
+  function askFamilyCode() {
+    const code = window.prompt('Grown-ups: please enter your family code.');
+    if (!code) return false;
+    try { localStorage.setItem(CODE_KEY, code.trim()); } catch (_) { /* ignore */ }
+    return true;
   }
 
   function showResult(r, celebrate) {
