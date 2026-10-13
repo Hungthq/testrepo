@@ -5,7 +5,7 @@ A drawing app for kids. **Your child draws anything they like and taps ✨ "What
 - 🎉 makes the drawing jump to life under a shower of emoji
 - 💬 says something kind about *their* drawing ("I love the pointy ears!")
 - 📖 tells a **fun story** starring their drawing as the hero, and reads it aloud
-- 🎵 writes a **short song** about it to a nursery tune everyone knows (Twinkle Twinkle, Row Row Row Your Boat, Mary Had a Little Lamb or London Bridge). Tap 🎤 **Sing along** to play the tune while each line lights up, karaoke-style
+- 🎵 writes a **short song** about it to a nursery tune everyone knows (Twinkle Twinkle, Row Row Row Your Boat, Mary Had a Little Lamb or London Bridge), and plays it with a little band: a "1-2-3-4" count-in, melody, chords, bass and drums, plus a big finish. The app sings each line as it lights up, karaoke-style. 🎶 **Music only** leaves the singing to your kids
 - 🧠 shares 3 fun facts, 😂 tells a joke, and 🔊 makes its sound ("Meow meow!")
 - 🎨 suggests what to draw next ("Can you draw a ball of yarn for the cat?")
 
@@ -59,7 +59,7 @@ The app also runs on [Vercel](https://vercel.com): the page is served as static 
 | File | What it does |
 |---|---|
 | `index.html`, `style.css` | The page and its kid-friendly styling (works on phones and tablets) |
-| `app.js` | Drawing tools, tracing lessons, speech, the ✨ result card, the sing-along player and the gallery |
+| `app.js` | Drawing tools, tracing lessons, speech, the ✨ result card, the song band (all made with Web Audio, no sound files) and the gallery |
 | `lib/look.js` | Sends the cropped drawing to Claude with a kid-safe prompt and gets back structured JSON (thing, emoji, story, song lyrics and tune, facts, joke, sound, challenge, other guesses) |
 | `server.js` | Local server: serves the app and handles `POST /api/look` using `lib/look.js` |
 | `api/look.js`, `api/health.js` | The same endpoints as Vercel Functions |

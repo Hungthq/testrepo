@@ -91,10 +91,20 @@
   }
 
   let audioCtx = null;
+  function ensureAudio() {
+    // Without this, iPhones mute web audio when the ring/silent switch is on.
+    if (navigator.audioSession) {
+      try { navigator.audioSession.type = 'playback'; } catch (_) { /* ignore */ }
+    }
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
   function chime(notes) {
     if (!state.sound) return;
     try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      ensureAudio();
       const t0 = audioCtx.currentTime;
       notes.forEach((freq, i) => {
         const osc = audioCtx.createOscillator();
@@ -762,10 +772,18 @@
       const lines = (r.song_lines || []).slice(0, 4).map((l) => add('p', l, 'song-line'));
       const sing = document.createElement('button');
       sing.className = 'pill-btn say-again';
-      sing.textContent = '🎤 Sing along';
-      sing.addEventListener('click', () => playSong(tune, lines, sing));
-      buttons.appendChild(sing);
+      sing.textContent = '🎤 Sing it!';
+      sing.addEventListener('click', () => playSong(tune, lines, sing, true));
+      const karaoke = document.createElement('button');
+      karaoke.className = 'pill-btn say-again';
+      karaoke.textContent = '🎶 Music only';
+      karaoke.addEventListener('click', () => playSong(tune, lines, karaoke, false));
+      buttons.append(sing, karaoke);
       say = (r.song_lines || []).join('. ');
+      if (read) {
+        read = false;
+        playSong(tune, lines, sing, true);
+      }
     } else if (tab === 'facts') {
       const ul = document.createElement('ul');
       (r.facts || []).forEach((f) => {
@@ -808,7 +826,8 @@
     },
     row: {
       name: 'Row, Row, Row Your Boat',
-      beat: 0.4,
+      beat: 0.36,
+      pulse: 1.5, // 6/8 time: three quick notes per pulse
       phrases: [
         [[C4, 1.5], [C4, 1.5], [C4, 1], [D4, 0.5], [E4, 1.5]],
         [[E4, 1], [D4, 0.5], [E4, 1], [F4, 0.5], [G4, 3]],
@@ -839,7 +858,138 @@
     },
   };
 
-  const song = { out: null, timers: [], button: null };
+  // ---------- The band: melody, chords, bass and drums, all made with Web Audio ----------
+  const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  // A chord for each melody note in C major: C, F or G.
+  const CHORD_FOR = { 0: 48, 4: 48, 7: 48, 5: 53, 9: 53, 2: 55, 11: 55 };
+  const noiseBuffers = new WeakMap();
+
+  function noiseBuffer(ctx) {
+    if (!noiseBuffers.has(ctx)) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      noiseBuffers.set(ctx, buf);
+    }
+    return noiseBuffers.get(ctx);
+  }
+
+  function tone(ctx, out, { type = 'sine', freq, at, len, vol, attack = 0.01, filter }) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    // Rise quickly, hold (gently fading) for most of the note, then let go.
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(vol, at + attack);
+    env.gain.exponentialRampToValueAtTime(vol * 0.6, at + Math.max(attack + 0.01, len * 0.75));
+    env.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    let node = osc;
+    if (filter) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = filter;
+      node = osc.connect(f);
+    }
+    node.connect(env).connect(out);
+    osc.start(at);
+    osc.stop(at + len + 0.05);
+  }
+
+  function noise(ctx, out, { at, len, vol, highpass }) {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx);
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = highpass;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(vol, at);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    src.connect(f).connect(env).connect(out);
+    src.start(at);
+    src.stop(at + len + 0.05);
+  }
+
+  function kick(ctx, out, at) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.frequency.setValueAtTime(150, at);
+    osc.frequency.exponentialRampToValueAtTime(45, at + 0.12);
+    env.gain.setValueAtTime(0.9, at);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.25);
+    osc.connect(env).connect(out);
+    osc.start(at);
+    osc.stop(at + 0.3);
+  }
+
+  // Schedules the whole song starting at time t0 (seconds) on any AudioContext,
+  // including an OfflineAudioContext. Returns when each line starts and when it ends.
+  function scheduleSong(ctx, out, tune, t0, { melodyVol = 0.45 } = {}) {
+    const beat = tune.beat;
+    const pulse = tune.pulse || 1;
+    const sub = pulse === 1.5 ? 3 : 2; // hi-hats per pulse
+    const notes = [];
+    const phraseStarts = [];
+    let b = 0;
+    tune.phrases.forEach((phrase) => {
+      phraseStarts.push(b);
+      phrase.forEach(([midi, len]) => { notes.push({ midi, b, len }); b += len; });
+    });
+    const songBeats = b;
+    const countIn = 4 * pulse;
+    const sec = (beats) => t0 + (countIn + beats) * beat;
+
+    // Count-in: "1, 2, 3, 4" on the drums.
+    for (let i = 0; i < 4; i++) {
+      const at = t0 + i * pulse * beat;
+      noise(ctx, out, { at, len: 0.07, vol: i === 0 ? 0.5 : 0.4, highpass: 2500 });
+    }
+
+    // Melody: a soft bell (triangle plus a quiet octave on top).
+    notes.forEach(({ midi, b: nb, len }) => {
+      const at = sec(nb);
+      const dur = Math.max(0.15, len * beat * 0.92);
+      tone(ctx, out, { type: 'triangle', freq: midiHz(midi), at, len: dur, vol: melodyVol });
+      tone(ctx, out, { type: 'sine', freq: midiHz(midi + 12), at, len: dur * 0.6, vol: melodyVol * 0.25 });
+    });
+
+    // Chords, bass and drums on every pulse.
+    const noteAt = (beatTime) => notes.find((n) => beatTime >= n.b && beatTime < n.b + n.len) || notes[notes.length - 1];
+    const pulses = Math.round(songBeats / pulse);
+    let lastRoot = null;
+    for (let k = 0; k < pulses; k++) {
+      const pb = k * pulse;
+      const at = sec(pb);
+      const len = pulse * beat;
+      const root = CHORD_FOR[noteAt(pb).midi % 12] ?? 48;
+      if (root !== lastRoot || k % 2 === 0) {
+        [0, 4, 7].forEach((iv) => tone(ctx, out, { freq: midiHz(root + iv), at, len: len * 2, vol: 0.06, attack: 0.05 }));
+        lastRoot = root;
+      }
+      const bassNote = k % 2 === 0 ? root - 12 : root - 5;
+      tone(ctx, out, { type: 'sawtooth', freq: midiHz(bassNote), at, len: len * 0.8, vol: 0.18, filter: 500 });
+      if (k % 2 === 0) kick(ctx, out, at);
+      else noise(ctx, out, { at, len: 0.14, vol: 0.28, highpass: 1500 });
+      for (let h = 0; h < sub; h++) {
+        noise(ctx, out, { at: at + (h * len) / sub, len: 0.035, vol: h === 0 ? 0.1 : 0.06, highpass: 7000 });
+      }
+    }
+
+    // Big finish: a strummed C chord and a cymbal.
+    const end = sec(songBeats);
+    [60, 64, 67, 72].forEach((m, i) => tone(ctx, out, { type: 'triangle', freq: midiHz(m), at: end + i * 0.06, len: 1.6, vol: 0.3 }));
+    tone(ctx, out, { type: 'sawtooth', freq: midiHz(36), at: end, len: 1.2, vol: 0.2, filter: 400 });
+    kick(ctx, out, end);
+    noise(ctx, out, { at: end, len: 1.4, vol: 0.18, highpass: 5000 });
+
+    return {
+      lineStarts: phraseStarts.map((pb) => sec(pb) - t0),
+      lineLengths: tune.phrases.map((ph) => ph.reduce((n, [, len]) => n + len, 0) * beat),
+      duration: end + 1.6 - t0,
+    };
+  }
+
+  const song = { out: null, timers: [], button: null, label: '', voice: false };
 
   function stopSong() {
     song.timers.forEach(clearTimeout);
@@ -848,51 +998,63 @@
       try { song.out.disconnect(); } catch (_) { /* ignore */ }
       song.out = null;
     }
+    if (song.voice && 'speechSynthesis' in window) speechSynthesis.cancel();
     document.querySelectorAll('.song-line.singing').forEach((el) => el.classList.remove('singing'));
-    if (song.button) song.button.textContent = '🎤 Sing along';
+    $('resultEmoji').classList.remove('dancing');
+    if (song.button) song.button.textContent = song.label;
     song.button = null;
   }
 
-  function playSong(tune, lineEls, button) {
+  // Sings one line, sped up or slowed down to fit its part of the music.
+  function singLine(text, seconds) {
+    if (!state.sound || !('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.pitch = 1.5;
+    u.rate = Math.min(1.5, Math.max(0.85, text.length / (14 * seconds * 0.85)));
+    speechSynthesis.speak(u);
+  }
+
+  function playSong(tune, lineEls, button, withVoice) {
     if (song.button === button) return stopSong(); // second tap stops
     stopSong();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
-    try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-    } catch (_) { return; }
+    let ctx;
+    try { ctx = ensureAudio(); } catch (_) { return; }
 
-    song.out = audioCtx.createGain();
-    song.out.gain.value = state.sound ? 0.3 : 0;
-    song.out.connect(audioCtx.destination);
+    const comp = ctx.createDynamicsCompressor();
+    song.out = ctx.createGain();
+    song.out.gain.value = state.sound ? 0.5 : 0;
+    song.out.connect(comp).connect(ctx.destination);
     song.button = button;
+    song.label = button.textContent;
+    song.voice = withVoice;
     button.textContent = '⏹️ Stop';
+    $('resultEmoji').classList.add('dancing');
 
-    const start = audioCtx.currentTime + 0.15;
-    let t = 0;
-    tune.phrases.forEach((phrase, i) => {
+    const lead = 0.15;
+    const plan = scheduleSong(ctx, song.out, tune, ctx.currentTime + lead, { melodyVol: withVoice ? 0.3 : 0.45 });
+    plan.lineStarts.forEach((startSec, i) => {
       song.timers.push(setTimeout(() => {
         lineEls.forEach((el, j) => el.classList.toggle('singing', j === i));
-      }, t * 1000 + 150));
-      phrase.forEach(([midi, beats]) => {
-        const len = beats * tune.beat;
-        const osc = audioCtx.createOscillator();
-        const env = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-        const at = start + t;
-        env.gain.setValueAtTime(0.0001, at);
-        env.gain.exponentialRampToValueAtTime(1, at + 0.02);
-        env.gain.exponentialRampToValueAtTime(0.0001, at + len * 0.95);
-        osc.connect(env).connect(song.out);
-        osc.start(at);
-        osc.stop(at + len);
-        t += len;
-      });
-      t += tune.beat * 0.5; // a little breath between lines
+        if (withVoice && lineEls[i]) singLine(lineEls[i].textContent, plan.lineLengths[i]);
+      }, (lead + startSec) * 1000));
     });
-    song.timers.push(setTimeout(stopSong, t * 1000 + 300));
+    song.timers.push(setTimeout(stopSong, (lead + plan.duration) * 1000));
   }
+
+  // For testing: render a song to an AudioBuffer without playing it.
+  window.__renderSong = async (tuneName) => {
+    const tune = TUNES[tuneName] || TUNES.twinkle;
+    const beats = tune.phrases.flat().reduce((n, [, len]) => n + len, 0) + 4 * (tune.pulse || 1);
+    const ctx = new OfflineAudioContext(1, Math.ceil((beats * tune.beat + 2.2) * 44100), 44100);
+    const out = ctx.createGain();
+    out.gain.value = 0.5;
+    out.connect(ctx.createDynamicsCompressor()).connect(ctx.destination);
+    const plan = scheduleSong(ctx, out, tune, 0.1);
+    return { buffer: await ctx.startRendering(), plan };
+  };
 
   function emojiRain(emoji) {
     const rain = $('emojiRain');
