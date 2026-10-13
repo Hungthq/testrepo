@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffd166">
+  <title>Draw &amp; Learn</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="logo">🖍️ Draw &amp; Learn</h1>
+    <nav class="modes" role="tablist">
+      <button class="mode-btn active" data-mode="free" role="tab">🎨 Draw</button>
+      <button class="mode-btn" data-mode="letters" role="tab">🔤 ABC</button>
+      <button class="mode-btn" data-mode="numbers" role="tab">🔢 123</button>
+      <button class="mode-btn" data-mode="shapes" role="tab">🔷 Shapes</button>
+    </nav>
+    <button id="soundBtn" class="icon-btn" title="Sound on/off" aria-label="Sound on/off">🔊</button>
+  </header>
+
+  <section id="lessonBar" class="lesson-bar hidden">
+    <button id="prevBtn" class="big-btn" aria-label="Previous">⬅️</button>
+    <div class="lesson-info">
+      <div id="lessonEmoji" class="lesson-emoji">🍎</div>
+      <div id="lessonText" class="lesson-text">A is for Apple</div>
+    </div>
+    <button id="hearBtn" class="big-btn" aria-label="Say it again">🗣️</button>
+    <button id="checkBtn" class="big-btn check" aria-label="Check my tracing">✅</button>
+    <button id="nextBtn" class="big-btn" aria-label="Next">➡️</button>
+  </section>
+
+  <main class="stage">
+    <div id="board" class="board">
+      <canvas id="guideCanvas"></canvas>
+      <canvas id="drawCanvas"></canvas>
+      <div id="celebrate" class="celebrate hidden">
+        <div id="stars" class="stars">⭐⭐⭐</div>
+        <div id="praise" class="praise">Great job!</div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="toolbar">
+    <div id="palette" class="palette" aria-label="Colors"></div>
+    <div class="tools">
+      <div class="sizes" aria-label="Brush size">
+        <button class="size-btn" data-size="6"><span style="width:8px;height:8px"></span></button>
+        <button class="size-btn active" data-size="14"><span style="width:14px;height:14px"></span></button>
+        <button class="size-btn" data-size="28"><span style="width:22px;height:22px"></span></button>
+      </div>
+      <button id="rainbowBtn" class="tool-btn" title="Rainbow brush">🌈</button>
+      <button id="stampBtn" class="tool-btn" title="Stickers">⭐</button>
+      <button id="eraserBtn" class="tool-btn" title="Eraser">🧽</button>
+      <button id="undoBtn" class="tool-btn" title="Undo">↩️</button>
+      <button id="clearBtn" class="tool-btn" title="Clear">🗑️</button>
+      <button id="saveBtn" class="tool-btn" title="Save picture">💾</button>
+    </div>
+    <div id="stampPicker" class="stamp-picker hidden"></div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

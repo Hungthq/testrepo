@@ -1,0 +1,254 @@
+:root {
+  --bg: #fff6e0;
+  --bar: #ffd166;
+  --ink: #3d2c5e;
+  --accent: #ef476f;
+  --ok: #06d6a0;
+  --card: #ffffff;
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Comic Sans MS", "Chalkboard SE", "Baloo 2", system-ui, sans-serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bar);
+  box-shadow: 0 3px 0 rgba(0,0,0,.08);
+  flex-wrap: wrap;
+}
+
+.logo {
+  margin: 0;
+  font-size: 1.5rem;
+  white-space: nowrap;
+}
+
+.modes {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.mode-btn {
+  background: var(--card);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  box-shadow: 0 3px 0 rgba(0,0,0,.15);
+  transition: transform .1s;
+}
+.mode-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.15); }
+.mode-btn.active { background: var(--accent); color: #fff; }
+
+.icon-btn {
+  font-size: 1.6rem;
+  background: var(--card);
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  box-shadow: 0 3px 0 rgba(0,0,0,.15);
+}
+
+/* ---------- Lesson bar ---------- */
+.lesson-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.lesson-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  padding: 6px 18px;
+  border-radius: var(--radius);
+  min-width: 0;
+  box-shadow: 0 3px 0 rgba(0,0,0,.1);
+}
+.lesson-emoji { font-size: 2.2rem; }
+.lesson-text { font-size: 1.4rem; font-weight: bold; }
+
+.big-btn {
+  font-size: 1.8rem;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 3px 0 rgba(0,0,0,.15);
+  flex-shrink: 0;
+}
+.big-btn:active { transform: translateY(2px); }
+.big-btn.check { background: var(--ok); }
+
+/* ---------- Board ---------- */
+.stage {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 16px;
+  display: flex;
+}
+
+.board {
+  position: relative;
+  flex: 1;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 0 rgba(0,0,0,.1), inset 0 0 0 4px #ffe7a3;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.board canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#drawCanvas { cursor: crosshair; }
+
+.celebrate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.75);
+  animation: pop .4s ease-out;
+  pointer-events: none;
+}
+.stars { font-size: 4rem; letter-spacing: 8px; }
+.praise { font-size: 2.4rem; font-weight: bold; color: var(--accent); text-align: center; padding: 0 16px; }
+
+@keyframes pop {
+  from { transform: scale(.6); opacity: 0; }
+  to   { transform: scale(1);  opacity: 1; }
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px 12px;
+  flex-wrap: wrap;
+}
+
+.palette {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 3px 0 rgba(0,0,0,.15);
+  transition: transform .1s;
+}
+.swatch.active { transform: scale(1.2); border-color: var(--ink); }
+
+.tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sizes {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 3px 0 rgba(0,0,0,.1);
+}
+.size-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.size-btn span { display: block; border-radius: 50%; background: var(--ink); }
+.size-btn.active { background: var(--bar); }
+
+.tool-btn {
+  font-size: 1.5rem;
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 3px 0 rgba(0,0,0,.15);
+}
+.tool-btn:active { transform: translateY(2px); }
+.tool-btn.active { background: var(--bar); outline: 3px solid var(--ink); }
+
+.stamp-picker {
+  position: absolute;
+  bottom: 100%;
+  right: 16px;
+  display: grid;
+  grid-template-columns: repeat(6, 48px);
+  gap: 6px;
+  padding: 10px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+  z-index: 5;
+}
+.stamp-picker button {
+  font-size: 2rem;
+  border-radius: 10px;
+}
+.stamp-picker button.active { background: var(--bar); }
+
+@media (max-width: 640px) {
+  .topbar { justify-content: space-between; }
+  .logo { font-size: 1.15rem; }
+  .icon-btn { width: 40px; height: 40px; font-size: 1.3rem; }
+  .modes { order: 3; flex: 1 0 100%; flex-wrap: nowrap; gap: 6px; }
+  .mode-btn { flex: 1; padding: 6px 4px; font-size: .9rem; white-space: nowrap; }
+  .lesson-text { font-size: 1.05rem; }
+  .lesson-emoji { font-size: 1.6rem; }
+  .big-btn { width: 44px; height: 44px; font-size: 1.3rem; }
+  .lesson-bar { gap: 6px; }
+  .swatch { width: 34px; height: 34px; }
+  .tool-btn { width: 42px; height: 42px; font-size: 1.25rem; }
+  .stamp-picker { grid-template-columns: repeat(5, 44px); right: 8px; }
+}
