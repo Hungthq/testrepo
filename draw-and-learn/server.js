@@ -25,11 +25,6 @@ const STATIC = {
 };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript' };
 
-const LANGUAGES = {
-  en: 'English',
-  vi: 'Vietnamese (Tiếng Việt)',
-};
-
 const SYSTEM = `You are "Doodle Buddy", a warm, playful friend inside a drawing app for young children (about 3 to 8 years old).
 A child has just drawn a picture with their finger and wants to know what you see.
 
@@ -44,15 +39,24 @@ How to write:
 - The compliment must mention something really in the picture (a color, a shape, a detail), so the child knows you truly looked.
 - Facts must be true, surprising and easy to picture. One sentence each.
 - The joke must be a gentle, silly, kid-friendly joke about the thing.
-- The story is 3 or 4 sentences, starring the thing the child drew, with a happy ending.
+- The story stars the thing the child drew as the hero. Give it a fun title and 5 to 7 sentences: a little adventure, one silly surprise, and a happy ending. Use details from the drawing (its colors, its shape) in the story.
+- The song is exactly 4 short lines about the thing, set to one well-known nursery tune. Each line must fit its line of the tune, using the same number of syllables as the original words, so it can be sung:
+  - "twinkle" (Twinkle Twinkle Little Star): 7, 7, 7, 7 syllables. Line 4 uses the tune of line 2.
+  - "row" (Row Row Row Your Boat): 5, 5, 12, 5 syllables. Line 3 can repeat a happy word, like "Merrily, merrily…".
+  - "mary" (Mary Had a Little Lamb): 7, 6, 7, 6 syllables. Line 2 can repeat a phrase, like "Little lamb, little lamb".
+  - "london" (London Bridge Is Falling Down): 7, 6, 7, 4 syllables.
+  Pick the tune whose rhythm suits the words best. Rhyme lines 2 and 4 if you can.
 - Nothing scary, violent, sad or grown-up. If the drawing looks like something scary, turn it into something friendly and silly.
 - Never ask for the child's name, address, school or any personal information.
-- Write every text field in the requested language. Keep "emoji" as one or two emoji characters.`;
+- Keep "emoji" as one or two emoji characters.`;
 
 const RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['recognized', 'thing', 'emoji', 'guesses', 'title', 'compliment', 'facts', 'joke', 'story', 'sound', 'challenge'],
+  required: [
+    'recognized', 'thing', 'emoji', 'guesses', 'title', 'compliment', 'facts', 'joke',
+    'story_title', 'story', 'song_title', 'song_tune', 'song_lines', 'sound', 'challenge',
+  ],
   properties: {
     recognized: { type: 'boolean', description: 'True if you are fairly sure what the drawing shows.' },
     thing: { type: 'string', description: 'The main thing in the drawing, 1-3 words, e.g. "cat" or "rainbow".' },
@@ -62,23 +66,24 @@ const RESULT_SCHEMA = {
     compliment: { type: 'string', description: 'One or two sentences praising specific details of this drawing.' },
     facts: { type: 'array', items: { type: 'string' }, description: 'Exactly 3 fun facts for kids.' },
     joke: { type: 'string', description: 'A short, silly joke about the thing.' },
-    story: { type: 'string', description: 'A 3-4 sentence happy story starring the thing.' },
+    story_title: { type: 'string', description: 'A fun title for the story, e.g. "Bubbles the Blue Cat Saves the Day".' },
+    story: { type: 'string', description: 'A 5-7 sentence fun story starring the thing, with a silly surprise and a happy ending.' },
+    song_title: { type: 'string', description: 'A short title for the song.' },
+    song_tune: { type: 'string', enum: ['twinkle', 'row', 'mary', 'london'], description: 'Which nursery tune the song is sung to.' },
+    song_lines: { type: 'array', items: { type: 'string' }, description: 'Exactly 4 song lines that fit the chosen tune.' },
     sound: { type: 'string', description: 'A fun sound the thing makes or might make, e.g. "Meow meow!" or "Whoosh!"' },
     challenge: { type: 'string', description: 'A fun idea for what to draw next to go with it.' },
   },
 };
 
-async function askClaude({ image, hint, lang }) {
-  const language = LANGUAGES[lang] || LANGUAGES.en;
-  const prompt = [
-    `Here is my drawing! What did I draw?`,
-    hint ? `Hint from the child: "${hint}".` : '',
-    `Answer in ${language}.`,
-  ].filter(Boolean).join(' ');
+async function askClaude({ image, hint }) {
+  const prompt = hint
+    ? `Here is my drawing! What did I draw? Hint from the child: "${hint}".`
+    : 'Here is my drawing! What did I draw?';
 
   const response = await client.beta.messages.create({
     model: MODEL,
-    max_tokens: 4000,
+    max_tokens: 6000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
     // A simple, playful task: low effort keeps the answer fast for an impatient little artist.
@@ -132,10 +137,9 @@ async function handleLook(req, res) {
     return send(res, 400, { error: 'Missing drawing' });
   }
   const hint = String(body.hint || '').slice(0, 80).replace(/["\n\r]/g, ' ').trim();
-  const lang = body.lang === 'vi' ? 'vi' : 'en';
 
   try {
-    const result = await askClaude({ image, hint, lang });
+    const result = await askClaude({ image, hint });
     send(res, 200, result);
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {

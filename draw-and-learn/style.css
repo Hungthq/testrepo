@@ -240,7 +240,6 @@ button {
 
 /* ---------- Top actions ---------- */
 .top-actions { display: flex; gap: 8px; }
-.icon-btn.lang { font-size: 1rem; font-weight: bold; }
 
 /* ---------- Magic button ---------- */
 .magic-btn {
@@ -331,7 +330,7 @@ button {
 .result-title { margin: 0 0 4px; font-size: 1.8rem; color: var(--accent); }
 .result-compliment { margin: 0; font-size: 1.15rem; }
 
-.fun-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 18px 0 10px; }
+.fun-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 18px 0 10px; }
 .fun-tab {
   padding: 10px 4px;
   border-radius: 16px;
@@ -351,6 +350,19 @@ button {
 }
 .fun-panel ul { margin: 0; padding-left: 1.2em; }
 .fun-panel li { margin: 4px 0; }
+.fun-panel h3 { margin: 0 0 6px; font-size: 1.3rem; color: #8338ec; }
+.fun-panel .tune { margin: -2px 0 8px; font-size: .95rem; opacity: .75; }
+.fun-panel .buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.fun-panel .buttons .say-again { margin: 0; }
+.song-line {
+  margin: 4px 0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 1.25rem;
+  transition: background .2s, transform .2s;
+}
+.song-line.singing { background: var(--bar); transform: scale(1.04); font-weight: bold; }
+.song-line.singing::after { content: " 🎵"; display: inline-block; animation: bounce .3s ease-in-out infinite alternate; }
 .fun-panel .sound-word { font-size: 2.4rem; font-weight: bold; text-align: center; color: #8338ec; }
 .fun-panel .say-again { display: block; margin: 10px auto 0; }
 
@@ -421,7 +433,9 @@ button {
   .result-emoji { font-size: 3.2rem; }
   .result-title { font-size: 1.35rem; }
   .result-compliment, .fun-panel { font-size: 1.02rem; }
-  .fun-tab { font-size: .85rem; }
+  .fun-tabs { gap: 5px; }
+  .fun-tab { font-size: .72rem; padding: 8px 2px; }
+  .song-line { font-size: 1.05rem; }
   .topbar { justify-content: space-between; }
   .logo { font-size: 1.15rem; }
   .icon-btn { width: 40px; height: 40px; font-size: 1.3rem; }

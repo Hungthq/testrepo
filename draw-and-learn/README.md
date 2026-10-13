@@ -4,10 +4,12 @@ A drawing app for kids. **Your child draws anything they like and taps ✨ "What
 
 - 🎉 makes the drawing jump to life under a shower of emoji
 - 💬 says something kind about *their* drawing ("I love the pointy ears!")
-- 🧠 shares 3 fun facts, 📖 tells a short story starring their drawing, 😂 tells a joke, and 🔊 makes its sound ("Meow meow!")
+- 📖 tells a **fun story** starring their drawing as the hero, and reads it aloud
+- 🎵 writes a **short song** about it to a nursery tune everyone knows (Twinkle Twinkle, Row Row Row Your Boat, Mary Had a Little Lamb or London Bridge). Tap 🎤 **Sing along** to play the tune while each line lights up, karaoke-style
+- 🧠 shares 3 fun facts, 😂 tells a joke, and 🔊 makes its sound ("Meow meow!")
 - 🎨 suggests what to draw next ("Can you draw a ball of yarn for the cat?")
 
-Everything is read aloud, so kids who can't read yet can use it too. If Claude guesses wrong, kids tap one of its other guesses, or type or 🎤 say what they drew, and it tries again. Every guessed drawing is kept in 🖼️ **My Gallery** on that device. The **EN/VI** button switches between English and Tiếng Việt.
+Everything is read aloud, so kids who can't read yet can use it too. If Claude guesses wrong, kids tap one of its other guesses, or type or 🎤 say what they drew, and it tries again. Every guessed drawing, with its story and song, is kept in 🖼️ **My Gallery** on that device.
 
 The app also has tracing lessons: 🔤 ABC, 🔢 123 and 🔷 Shapes, with stars for good tracing. These work without the server.
 
@@ -46,5 +48,5 @@ The ✨ button uses the Claude API. The key stays on a small server on your comp
 | File | What it does |
 |---|---|
 | `index.html`, `style.css` | The page and its kid-friendly styling (works on phones and tablets) |
-| `app.js` | Drawing tools, tracing lessons, speech, the ✨ result card and the gallery |
-| `server.js` | Serves the app and handles `POST /api/look`. It crops the drawing, sends it to Claude with a kid-safe prompt, and gets back structured JSON (thing, emoji, facts, story, joke, sound, challenge, other guesses) |
+| `app.js` | Drawing tools, tracing lessons, speech, the ✨ result card, the sing-along player and the gallery |
+| `server.js` | Serves the app and handles `POST /api/look`. It crops the drawing, sends it to Claude with a kid-safe prompt, and gets back structured JSON (thing, emoji, story, song lyrics and tune, facts, joke, sound, challenge, other guesses) |

@@ -63,7 +63,6 @@
     stamp: STAMPS[0],
     hue: 0,
     sound: true,
-    lang: 'en',
     index: { letters: 0, numbers: 0, shapes: 0 },
   };
 
@@ -81,11 +80,11 @@
   let boardH = 0;
 
   // ---------- Sound ----------
-  function speak(text, lang = 'en') {
+  function speak(text) {
     if (!state.sound || !text || !('speechSynthesis' in window)) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === 'vi' ? 'vi-VN' : 'en-US';
+    u.lang = 'en-US';
     u.rate = 0.85;
     u.pitch = 1.25;
     speechSynthesis.speak(u);
@@ -575,45 +574,22 @@
   }
 
   // ---------- "What did I draw?" (Claude looks at the drawing) ----------
-  const UI = {
-    en: {
-      magic: 'What did I draw?', loading: ['Hmm… let me look!', 'Ooh, interesting…', 'Looking closely…'],
-      empty: 'Draw something first, then press me!', notSure: 'Hmm, is it…', notQuite: 'Not quite? Is it…',
-      hintPlaceholder: 'I drew a…', tryAgain: 'Try again', newDrawing: 'New drawing',
-      facts: 'Facts', story: 'Story', joke: 'Joke', sound: 'Sound', sayAgain: '🔊 Again',
-      gallery: 'My Gallery', galleryEmpty: 'Your drawings will show up here after you press ✨',
-      errors: {
-        offline: 'The magic needs a grown-up to start the Draw & Learn server. (See the README!)',
-        setup: 'The magic key is missing. Ask a grown-up to set it up.',
-        busy: 'So many drawings! Let\'s wait a moment and try again.',
-        failed: 'Oops! My magic glasses got foggy. Let\'s try again!',
-      },
-    },
-    vi: {
-      magic: 'Bé vẽ gì đây?', loading: ['Ừm… để tớ xem nào!', 'Ồ, thú vị quá…', 'Đang nhìn kỹ…'],
-      empty: 'Bé hãy vẽ gì đó trước, rồi bấm tớ nhé!', notSure: 'Ừm, có phải là…', notQuite: 'Chưa đúng à? Có phải là…',
-      hintPlaceholder: 'Bé vẽ con…', tryAgain: 'Thử lại', newDrawing: 'Vẽ tranh mới',
-      facts: 'Điều hay', story: 'Truyện', joke: 'Câu đố vui', sound: 'Âm thanh', sayAgain: '🔊 Nghe lại',
-      gallery: 'Tranh của bé', galleryEmpty: 'Tranh của bé sẽ hiện ở đây sau khi bấm ✨',
-      errors: {
-        offline: 'Phép thuật cần người lớn bật máy chủ Draw & Learn. (Xem README nhé!)',
-        setup: 'Thiếu chìa khoá phép thuật. Nhờ người lớn cài đặt giúp nhé.',
-        busy: 'Nhiều tranh quá! Đợi một chút rồi thử lại nhé.',
-        failed: 'Ối! Kính thần kỳ của tớ bị mờ rồi. Thử lại nhé!',
-      },
+  const TEXT = {
+    loading: ['Hmm… let me look!', 'Ooh, interesting…', 'Looking closely…'],
+    empty: 'Draw something first, then press me!',
+    notSure: 'Hmm, is it…',
+    notQuite: 'Not quite? Is it…',
+    sayAgain: '🔊 Again',
+    errors: {
+      offline: 'The magic needs a grown-up to start the Draw & Learn server. (See the README!)',
+      setup: 'The magic key is missing. Ask a grown-up to set it up.',
+      busy: 'So many drawings! Let\'s wait a moment and try again.',
+      failed: 'Oops! My magic glasses got foggy. Let\'s try again!',
     },
   };
-  const t = (key) => UI[state.lang][key];
 
-  const look = { result: null, image: null, thumb: null, tab: 'facts' };
+  const look = { result: null, image: null, thumb: null, tab: 'story' };
   const lookModal = $('lookModal');
-
-  function applyLanguage() {
-    $('langBtn').textContent = state.lang === 'vi' ? 'VI' : 'EN';
-    $('magicLabel').textContent = t('magic');
-    $('hintInput').placeholder = t('hintPlaceholder');
-    document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  }
 
   // Crops the drawing to what was actually drawn, on a white background, as PNG base64.
   function exportDrawing(maxSize) {
@@ -658,8 +634,8 @@
     if (!hint) {
       const canvas = exportDrawing(768);
       if (!canvas) {
-        showMessage('✏️', t('empty'));
-        speak(t('empty'), state.lang);
+        showMessage('✏️', TEXT.empty);
+        speak(TEXT.empty);
         return;
       }
       look.image = canvas.toDataURL('image/png');
@@ -669,16 +645,16 @@
     clearTimeout(revealTimer);
     lookModal.classList.remove('hidden');
     showLookState('loading');
-    const lines = t('loading');
+    const lines = TEXT.loading;
     const line = lines[Math.floor(Math.random() * lines.length)];
     $('loadingText').textContent = line;
-    speak(line, state.lang);
+    speak(line);
 
     try {
       const res = await fetch('api/look', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: look.image, hint, lang: state.lang }),
+        body: JSON.stringify({ image: look.image, hint }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || (res.status === 404 || res.status === 405 ? 'offline' : 'failed'));
@@ -686,10 +662,10 @@
       saveToGallery(body);
     } catch (err) {
       const key = err instanceof TypeError ? 'offline' : err.message;
-      const msg = t('errors')[key] || t('errors').failed;
+      const msg = TEXT.errors[key] || TEXT.errors.failed;
       $('errorText').textContent = msg;
       showLookState('error');
-      speak(msg, state.lang);
+      speak(msg);
     }
   }
 
@@ -698,7 +674,7 @@
     $('resultEmoji').textContent = r.emoji || '🎨';
     $('lookTitle').textContent = r.title;
     $('resultCompliment').textContent = r.compliment;
-    $('guessLabel').textContent = r.recognized ? t('notQuite') : t('notSure');
+    $('guessLabel').textContent = r.recognized ? TEXT.notQuite : TEXT.notSure;
     const chips = $('guessChips');
     chips.textContent = '';
     (r.guesses || []).slice(0, 3).forEach((g) => {
@@ -711,15 +687,16 @@
     $('hintInput').value = '';
     $('challengeText').textContent = r.challenge;
     showLookState('result');
-    setTab('facts', false);
+    setTab('story', false);
+    const intro = `${r.title} ${r.compliment} Here is a story for you. ${r.story_title}. ${r.story}`;
     if (!celebrate) {
-      speak(`${r.title} ${r.compliment}`, state.lang);
+      speak(intro);
       return;
     }
     // Celebrate first: the drawing jumps to life under a shower of emoji, then the card pops up.
     lookModal.classList.add('hidden');
     chime([523, 659, 784, 1047]);
-    speak(r.sound, state.lang);
+    speak(r.sound);
     emojiRain(r.recognized && r.emoji ? r.emoji : '⭐');
     drawCanvas.classList.remove('alive');
     void drawCanvas.offsetWidth;
@@ -728,7 +705,7 @@
     revealTimer = setTimeout(() => {
       if (look.result !== r) return;
       lookModal.classList.remove('hidden');
-      speak(`${r.title} ${r.compliment}`, state.lang);
+      speak(intro);
     }, 1800);
   }
   let revealTimer = null;
@@ -736,12 +713,38 @@
   function setTab(tab, read = true) {
     const r = look.result;
     if (!r) return;
+    stopSong();
     look.tab = tab;
     document.querySelectorAll('.fun-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     const panel = $('funPanel');
     panel.textContent = '';
+    const add = (tag, text, className) => {
+      const el = document.createElement(tag);
+      el.textContent = text;
+      if (className) el.className = className;
+      panel.appendChild(el);
+      return el;
+    };
+    const buttons = document.createElement('div');
+    buttons.className = 'buttons';
     let say = '';
-    if (tab === 'facts') {
+
+    if (tab === 'story') {
+      add('h3', `📖 ${r.story_title}`);
+      add('p', r.story).style.margin = '0';
+      say = `${r.story_title}. ${r.story}`;
+    } else if (tab === 'song') {
+      const tune = TUNES[r.song_tune] || TUNES.twinkle;
+      add('h3', `🎵 ${r.song_title}`);
+      add('p', `To the tune of “${tune.name}”`, 'tune');
+      const lines = (r.song_lines || []).slice(0, 4).map((l) => add('p', l, 'song-line'));
+      const sing = document.createElement('button');
+      sing.className = 'pill-btn say-again';
+      sing.textContent = '🎤 Sing along';
+      sing.addEventListener('click', () => playSong(tune, lines, sing));
+      buttons.appendChild(sing);
+      say = (r.song_lines || []).join('. ');
+    } else if (tab === 'facts') {
       const ul = document.createElement('ul');
       (r.facts || []).forEach((f) => {
         const li = document.createElement('li');
@@ -751,21 +754,122 @@
       panel.appendChild(ul);
       say = (r.facts || []).join(' ');
     } else if (tab === 'sound') {
-      const d = document.createElement('div');
-      d.className = 'sound-word';
-      d.textContent = `${r.emoji || ''} ${r.sound}`;
-      panel.appendChild(d);
+      add('div', `${r.emoji || ''} ${r.sound}`, 'sound-word');
       say = r.sound;
     } else {
-      panel.textContent = tab === 'story' ? r.story : r.joke;
-      say = panel.textContent;
+      add('p', r.joke).style.margin = '0';
+      say = r.joke;
     }
+
     const again = document.createElement('button');
     again.className = 'pill-btn say-again';
-    again.textContent = t('sayAgain');
-    again.addEventListener('click', () => speak(say, state.lang));
-    panel.appendChild(again);
-    if (read) speak(say, state.lang);
+    again.textContent = tab === 'song' ? '🔊 Read it' : TEXT.sayAgain;
+    again.addEventListener('click', () => { stopSong(); speak(say); });
+    buttons.appendChild(again);
+    panel.appendChild(buttons);
+    if (read) speak(say);
+  }
+
+  // ---------- Sing-along: plays the nursery tune and lights up each line ----------
+  // Notes are [MIDI note, beats]. Each tune has 4 phrases, one per song line.
+  const C4 = 60, D4 = 62, E4 = 64, F4 = 65, G4 = 67, A4 = 69, C5 = 72;
+  const TUNES = {
+    twinkle: {
+      name: 'Twinkle Twinkle Little Star',
+      beat: 0.42,
+      phrases: [
+        [[C4, 1], [C4, 1], [G4, 1], [G4, 1], [A4, 1], [A4, 1], [G4, 2]],
+        [[F4, 1], [F4, 1], [E4, 1], [E4, 1], [D4, 1], [D4, 1], [C4, 2]],
+        [[G4, 1], [G4, 1], [F4, 1], [F4, 1], [E4, 1], [E4, 1], [D4, 2]],
+        [[F4, 1], [F4, 1], [E4, 1], [E4, 1], [D4, 1], [D4, 1], [C4, 2]],
+      ],
+    },
+    row: {
+      name: 'Row, Row, Row Your Boat',
+      beat: 0.4,
+      phrases: [
+        [[C4, 1.5], [C4, 1.5], [C4, 1], [D4, 0.5], [E4, 1.5]],
+        [[E4, 1], [D4, 0.5], [E4, 1], [F4, 0.5], [G4, 3]],
+        [[C5, 0.5], [C5, 0.5], [C5, 0.5], [G4, 0.5], [G4, 0.5], [G4, 0.5],
+          [E4, 0.5], [E4, 0.5], [E4, 0.5], [C4, 0.5], [C4, 0.5], [C4, 0.5]],
+        [[G4, 1], [F4, 0.5], [E4, 1], [D4, 0.5], [C4, 3]],
+      ],
+    },
+    mary: {
+      name: 'Mary Had a Little Lamb',
+      beat: 0.4,
+      phrases: [
+        [[E4, 1], [D4, 1], [C4, 1], [D4, 1], [E4, 1], [E4, 1], [E4, 2]],
+        [[D4, 1], [D4, 1], [D4, 2], [E4, 1], [G4, 1], [G4, 2]],
+        [[E4, 1], [D4, 1], [C4, 1], [D4, 1], [E4, 1], [E4, 1], [E4, 2]],
+        [[E4, 1], [D4, 1], [D4, 1], [E4, 1], [D4, 1], [C4, 3]],
+      ],
+    },
+    london: {
+      name: 'London Bridge Is Falling Down',
+      beat: 0.4,
+      phrases: [
+        [[G4, 1.5], [A4, 0.5], [G4, 1], [F4, 1], [E4, 1], [F4, 1], [G4, 2]],
+        [[D4, 1], [E4, 1], [F4, 2], [E4, 1], [F4, 1], [G4, 2]],
+        [[G4, 1.5], [A4, 0.5], [G4, 1], [F4, 1], [E4, 1], [F4, 1], [G4, 2]],
+        [[D4, 2], [G4, 2], [E4, 1], [C4, 3]],
+      ],
+    },
+  };
+
+  const song = { out: null, timers: [], button: null };
+
+  function stopSong() {
+    song.timers.forEach(clearTimeout);
+    song.timers = [];
+    if (song.out) {
+      try { song.out.disconnect(); } catch (_) { /* ignore */ }
+      song.out = null;
+    }
+    document.querySelectorAll('.song-line.singing').forEach((el) => el.classList.remove('singing'));
+    if (song.button) song.button.textContent = '🎤 Sing along';
+    song.button = null;
+  }
+
+  function playSong(tune, lineEls, button) {
+    if (song.button === button) return stopSong(); // second tap stops
+    stopSong();
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (_) { return; }
+
+    song.out = audioCtx.createGain();
+    song.out.gain.value = state.sound ? 0.3 : 0;
+    song.out.connect(audioCtx.destination);
+    song.button = button;
+    button.textContent = '⏹️ Stop';
+
+    const start = audioCtx.currentTime + 0.15;
+    let t = 0;
+    tune.phrases.forEach((phrase, i) => {
+      song.timers.push(setTimeout(() => {
+        lineEls.forEach((el, j) => el.classList.toggle('singing', j === i));
+      }, t * 1000 + 150));
+      phrase.forEach(([midi, beats]) => {
+        const len = beats * tune.beat;
+        const osc = audioCtx.createOscillator();
+        const env = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        const at = start + t;
+        env.gain.setValueAtTime(0.0001, at);
+        env.gain.exponentialRampToValueAtTime(1, at + 0.02);
+        env.gain.exponentialRampToValueAtTime(0.0001, at + len * 0.95);
+        osc.connect(env).connect(song.out);
+        osc.start(at);
+        osc.stop(at + len);
+        t += len;
+      });
+      t += tune.beat * 0.5; // a little breath between lines
+    });
+    song.timers.push(setTimeout(stopSong, t * 1000 + 300));
   }
 
   function emojiRain(emoji) {
@@ -788,6 +892,7 @@
 
   function closeModal(modal) {
     clearTimeout(revealTimer);
+    stopSong();
     modal.classList.add('hidden');
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     stopListening();
@@ -806,7 +911,7 @@
     if (recognizer) return stopListening();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     recognizer = new Recognition();
-    recognizer.lang = state.lang === 'vi' ? 'vi-VN' : 'en-US';
+    recognizer.lang = 'en-US';
     recognizer.interimResults = false;
     recognizer.maxAlternatives = 1;
     recognizer.onresult = (e) => {
@@ -883,25 +988,18 @@
   $('micBtn').addEventListener('click', listen);
   $('challengeBtn').addEventListener('click', () => {
     closeModal(lookModal);
-    if (look.result) speak(look.result.challenge, state.lang);
+    if (look.result) speak(look.result.challenge);
   });
   $('newDrawingBtn').addEventListener('click', () => {
     closeModal(lookModal);
     clearDrawing(true);
   });
   $('galleryBtn').addEventListener('click', openGallery);
-  $('langBtn').addEventListener('click', () => {
-    state.lang = state.lang === 'en' ? 'vi' : 'en';
-    try { localStorage.setItem('draw-and-learn-lang', state.lang); } catch (_) { /* ignore */ }
-    applyLanguage();
-  });
   document.querySelectorAll('.modal').forEach((m) => {
     m.addEventListener('click', (e) => {
       if (e.target === m || e.target.closest('[data-close]')) closeModal(m);
     });
   });
-  try { state.lang = localStorage.getItem('draw-and-learn-lang') === 'vi' ? 'vi' : 'en'; } catch (_) { /* ignore */ }
-  applyLanguage();
 
   // ---------- Wire up ----------
   document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
